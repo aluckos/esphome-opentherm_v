@@ -141,6 +141,12 @@ namespace opentherm {
 #ifndef OPENTHERM_READ_dhw_block
 #define OPENTHERM_READ_dhw_block false
 #endif
+#ifndef OPENTHERM_READ_t_supply_inlet
+#define OPENTHERM_READ_t_supply_inlet 0.0
+#endif
+#ifndef OPENTHERM_READ_t_supply_outlet
+#define OPENTHERM_READ_t_supply_outlet 0.0
+#endif
 
 // These macros utilize the structure of *_LIST macros in order
 #define ID(x) x
