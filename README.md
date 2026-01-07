@@ -1,3 +1,11 @@
+# ❗ OpenTherm in ESPHome core
+
+Starting with ESPHome 2024.11 this component is included in core! 🎉 There is no need to reference this repository for
+normal usage scenarios. Use [official documentation](https://esphome.io/components/opentherm.html) to configure your
+OpenTherm bridge.
+
+If you want to test bleeding edge features and fixes, read the Usage section below.
+
 # OpenTherm Component for ESPHome
 
 OpenTherm (OT) is a standard communications protocol used in central heating systems for the communication between
@@ -17,18 +25,6 @@ boiler.
 
 There are plans to add support for a gateway mode, but I don't have any timeline to share at the moment.
 
-## OpenTherm in ESPHome core
-
-Several pull requests to include this component into ESPHome core were initiated:
-   * https://github.com/esphome/esphome/pull/6645 — done
-   * https://github.com/esphome/esphome/pull/7529 — done
-   * https://github.com/esphome/esphome/pull/7676 — under review (hopefully, the last part!)
-
-The code in those pull requests and this repo's `main` branch are kept in sync. There will be no need to reference
-this repo as an external component after it is merged into ESPHome.
-
-`develop` branch in this repo will contain bleeding edge code that is not yet proposed to be merged into ESPHome.
-
 ## Quick glossary
 
 - CH: Central Heating
@@ -36,18 +32,29 @@ this repo as an external component after it is merged into ESPHome.
 
 ## Usage
 
-Until this component is merged into ESPHome core, you need to add this repository as external component to your config:
+As I've mentioned before, this component is now part of ESPHome core. Most users don't need this repository. Just follow
+the [official documentation](https://esphome.io/components/opentherm.html) to setup your bridge.
+
+### Testing unstable versions
+
+If you want to test unstable versions of the code, choose your branch first:
+
+* `main` — contains the code that was merged to ESPHome core. No need to reference this branch in your config really.
+* `develop` — bleeding edge changes that are not yet proposed to be merged. Individual commits may not even compile.
+  **Use commit hashes or known tags to reference individual commits from this branch!**
+* `pr_*` — Changes that correspond to open PRs to ESPHome core.
+
+After you've chosen your branch, or individual commit, add this repository as external component to your config:
 
 ```yaml
 external_components:
-  source: github://olegtarasov/esphome-opentherm@main
+  source: github://olegtarasov/esphome-opentherm[@<branch or tag>]
+  refresh: 0s
 ```
 
-This references the main branch, which is cool if you want to stay up to date, but may also break your configuration
-if breaking changes happen here. A better idea would be to reference a specific version, see the tags for available
-versions. Instead of a specific version, you could also choose to follow a major version by specifying `@v1` etc.
+## Declaring the OpenTherm hub
 
-Then, you need to define the OpenTherm hub in your configuration. Note that most OpenTherm adapters label `in` and
+You need to declare the OpenTherm hub in your configuration. Note that most OpenTherm adapters label `in` and
 `out` pins relative to themselves; this component labels its `in` and `out` pins relative to the microcontroller
 ESPHome runs on. As such, your bridge's `in` pin becomes the hub's `out` pin and vice versa.
 
@@ -57,7 +64,7 @@ opentherm:
   out_pin: GPIOXX
 ```
 
-### Configuration variables:
+### Configuration variables
 
 - `in_pin` (**Required**, number): The pin of the OpenTherm hardware bridge which is usually labeled ``out`` on the
   board.
@@ -66,7 +73,29 @@ opentherm:
 - `sync_mode` (**Optional**, boolean, default **false**): Synchronous communication mode prevents other components
   from disabling interrupts while we are talking to the boiler. Enable if you experience a lot of random intermittent
   invalid response errors (very likely to happen while using Dallas temperature sensors).
-- `id` (*Optional*): Manually specify the ID used for code generation.  Required if you have multiple buses.
+- `id` (**Optional**): Manually specify the ID used for code generation.  Required if you have multiple buses.
+
+#### Optional boiler-specific configuration
+
+Some boilers require certain OpenTherm messages to be sent by thermostat on initialization in order to work correctly.
+You can use the following settings in hub configuration to make your particular boiler happy.
+
+<!-- BEGIN schema_docs:setting -->
+- `controller_product_type` (**Optional**, byte [0-255], OpenTherm message id `126` high byte): Controller product type
+- `controller_product_version` (**Optional**, byte [0-255], OpenTherm message id `126` low byte): Controller product
+  version
+- `opentherm_version_controller` (**Optional**, float, OpenTherm message id `124`): Version of OpenTherm implemented by
+controller
+- `controller_configuration` (**Optional**, byte [0-255], OpenTherm message id `2` high byte): Controller configuration
+- `controller_id` (**Optional**, byte [0-255], OpenTherm message id `2` low byte): Controller ID code
+<!-- END schema_docs:setting -->
+
+#### Automations
+
+- `before_send` (**Optional**) An automation to perform on OpenTherm message before it is sent to the boiler.
+- `before_process_response` (**Optional**) An automation to perform on boiler response before it is processed.
+
+See [below](#on-the-fly-message-editing) for details.
 
 ### Note abut sync mode
 
@@ -316,6 +345,64 @@ available:
 - `otc_hc_ratio_ub`: OTC heat curve ratio upper bound ()
 - `otc_hc_ratio_lb`: OTC heat curve ratio lower bound ()
 <!-- END schema_docs:sensor -->
+
+#### Fan speed sensor
+
+An issue was raised about `fan_speed` sensor giving wonky values: https://github.com/olegtarasov/esphome-opentherm/issues/12.
+It turned out that originally this library was using unsigned 16-bit integer to interpret fan speed, and it didn't work
+for some boilers. OpenTherm specification suggests that 8-bit integer should be used, with another 8 bits being a
+separate sensor, `fan_speed_setpoint`. Tests have also shown that for those boilers value interpreted as 8-bit integer
+should be further multiplied by 60 to obtain final RPM value.
+
+I decided to modify `fan_speed` sensor to work as 8-bit integer, performing the multiplication automatically, because
+it's closer to OpenTherm specification.
+
+Obviously, this breaks `fan_speed` sensor for boilers that encode values as 16-bit integers. In order to fix this, we
+added `data_type` property which allows to override sensor data type.
+
+So if you configured a `fan_speed` sensor, but suspect that it gives the wrong values, try to reconfigure it as follows:
+
+```yaml
+sensor:
+  - platform: opentherm
+    fan_speed:
+      name: "Boiler fan speed"
+      data_type: "u16" # overrides the default u8_lb_60 message
+```
+
+### On-the-fly message editing
+
+Some boilers use non-standard message ids and formats. For example, [it's known](https://github.com/olegtarasov/esphome-opentherm/issues/11)
+that Daikin D2C boiler uses message id `162` instead of `56` to set target DHW temperature. In order to accomodate all
+sorts of non-standard behavior, I introduced two automations that allow editing the low-level OpenTherm message:
+
+- `before_send`: fired just before the fully formed message is sent to the boiler. When you use a lambda, the message
+  is passed by reference as `x`.
+- `before_process_response`: fired when response message is received from the boiler and is about to be processed.
+  When you use a lambda, the message is passed by reference as `x`.
+
+This allows to make arbitrary alterations to any message. Here is an example of overriding message id for DHW setpoint
+for Daikin D2C boiler:
+
+```yaml
+opentherm:
+  # Usual hub config
+  before_send:
+      then:
+        - lambda: |-
+            if (x.id == 56) { // 56 is standard message id for DHW setpoint
+              x.id = 162;     // message is passed by refence, so we can change anything, including message id
+            }
+  before_process_response:
+    then:
+      - lambda: |-
+          if (x.id == 162) { // We substitute the original id back, so that esphome is not confused.
+            x.id = 56;
+          }
+```
+
+You can check the [OpenthermData reference](https://esphome.io/api/structesphome_1_1opentherm_1_1_opentherm_data) for
+the list of all available fields.
 
 # Examples
 
