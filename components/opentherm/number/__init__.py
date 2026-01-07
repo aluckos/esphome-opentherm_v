@@ -10,7 +10,6 @@ from esphome.const import (
     CONF_MAX_VALUE,
     CONF_STEP,
 )
-# Importujemy namespace i komponent główny z folderu wyżej
 from .. import opentherm_ns, OpenthermComponent, CONF_OPENTHERM_ID
 
 # Deklaracja klasy C++
@@ -20,29 +19,29 @@ OpenthermNumber = opentherm_ns.class_(
 
 CONF_MSG_ID = "msg_id"
 
-CONFIG_SCHEMA = number.NUMBER_SCHEMA.extend(
+# Używamy number.number_schema() zamiast number.NUMBER_SCHEMA
+CONFIG_SCHEMA = number.number_schema(
+    OpenthermNumber,
+).extend(
     {
-        cv.GenerateID(): cv.declare_id(OpenthermNumber),
         cv.GenerateID(CONF_OPENTHERM_ID): cv.use_id(OpenthermComponent),
-        cv.Required(CONF_NAME): cv.string,
-        cv.Required(CONF_MSG_ID): cv.uint8_t, # To odblokowuje msg_id w YAML
+        cv.Required(CONF_MSG_ID): cv.uint8_t,
         cv.Optional(CONF_INITIAL_VALUE): cv.float_,
         cv.Optional(CONF_RESTORE_VALUE, default=False): cv.bool_,
-        cv.Optional(CONF_MIN_VALUE, default=0): cv.float_,
-        cv.Optional(CONF_MAX_VALUE, default=100): cv.float_,
-        cv.Optional(CONF_STEP, default=1): cv.float_,
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
 async def to_code(config):
     var = cg.new_pointer(config[CONF_ID])
     await cg.register_component(var, config)
+    
+    # Rejestracja bazy komponentu number
     await number.register_number(
         var,
         config,
-        min_value=config[CONF_MIN_VALUE],
-        max_value=config[CONF_MAX_VALUE],
-        step=config[CONF_STEP],
+        min_value=config[CONF_MIN_VALUE] if CONF_MIN_VALUE in config else 0,
+        max_value=config[CONF_MAX_VALUE] if CONF_MAX_VALUE in config else 100,
+        step=config[CONF_STEP] if CONF_STEP in config else 1,
     )
 
     parent = await cg.get_variable(config[CONF_OPENTHERM_ID])
