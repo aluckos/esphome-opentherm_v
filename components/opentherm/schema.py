@@ -99,6 +99,16 @@ SENSORS: dict[str, SensorSchema] = {
         keep_updated=True,
         message_data="f88",
     ),
+    "flow_rate": SensorSchema(
+        description="Air flow rate (Brink TSP 52/53)",
+        unit_of_measurement="m³/h",
+        accuracy_decimals=0,
+        icon="mdi:weather-windy",
+        state_class=STATE_CLASS_MEASUREMENT,
+        message="HVAC_IDX_TSP", # Powiązanie z ID 89
+        keep_updated=True,
+        message_data="u16", # Choć obsłużymy to ręcznie w hub.cpp, schemat musi istnieć
+    ),
     "t_boiler": SensorSchema(
         description="Boiler water temperature",
         unit_of_measurement=UNIT_CELSIUS,
