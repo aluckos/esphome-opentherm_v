@@ -1,31 +1,36 @@
-#pragma once
-
-#include "esphome/components/number/number.h"
-#include "esphome/core/component.h"
-#include "../hub.h" 
+#include "opentherm_number.h"
+#include "esphome/core/log.h"
 
 namespace esphome {
 namespace opentherm {
 
-class OpenthermHub; 
+static const char *const TAG = "opentherm.number";
 
-class OpenthermNumber : public number::Number, public Component {
- protected:
-  void control(float value) override;
-  void dump_config() override;
-  void setup() override; // Dodano deklarację setup
+// TO JEST BRAKUJĄCY ELEMENT:
+void OpenthermNumber::setup() {
+  if (!std::isnan(this->initial_value_)) {
+    this->publish_state(this->initial_value_);
+  }
+}
 
-  uint8_t message_id_{0}; 
-  float initial_value_{NAN}; // Dodano zmienną dla początkowej wartości
-  bool restore_value_{false}; // Dodano zmienną dla przywracania stanu
-  OpenthermHub *parent_{nullptr};
+void OpenthermNumber::control(float value) {
+  if (this->parent_ != nullptr && this->message_id_ != 0) {
+    OpenthermData data;
+    data.type = MessageType::WRITE_DATA;
+    data.id = this->message_id_;
+    data.u16((uint16_t)value); 
+    
+    this->parent_->send_raw_message(data);
+    this->publish_state(value);
+    
+    ESP_LOGD(TAG, "Wysłano nastawę OpenTherm ID %d: %.1f", this->message_id_, value);
+  }
+}
 
- public:
-  void set_parent(OpenthermHub *parent) { parent_ = parent; }
-  void set_message_id(uint8_t msg_id) { this->message_id_ = msg_id; }
-  void set_initial_value(float initial_value) { initial_value_ = initial_value; }
-  void set_restore_value(bool restore_value) { restore_value_ = restore_value; }
-};
+void OpenthermNumber::dump_config() {
+  LOG_NUMBER(TAG, "OpenTherm Number", this);
+  ESP_LOGCONFIG(TAG, "  Message ID: %u", this->message_id_);
+}
 
 }  // namespace opentherm
 }  // namespace esphome
