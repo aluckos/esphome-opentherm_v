@@ -19,7 +19,6 @@ OpenthermNumber = opentherm_ns.class_(
 
 CONF_MSG_ID = "msg_id"
 
-# Używamy number.number_schema() zamiast number.NUMBER_SCHEMA
 CONFIG_SCHEMA = number.number_schema(
     OpenthermNumber,
 ).extend(
@@ -27,7 +26,8 @@ CONFIG_SCHEMA = number.number_schema(
         cv.GenerateID(CONF_OPENTHERM_ID): cv.use_id(OpenthermComponent),
         cv.Required(CONF_MSG_ID): cv.uint8_t,
         cv.Optional(CONF_INITIAL_VALUE): cv.float_,
-        cv.Optional(CONF_RESTORE_VALUE, default=False): cv.bool_,
+        # POPRAWKA: cv.boolean zamiast cv.bool_
+        cv.Optional(CONF_RESTORE_VALUE, default=False): cv.boolean,
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
