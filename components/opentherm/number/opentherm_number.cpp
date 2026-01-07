@@ -6,6 +6,13 @@ namespace opentherm {
 
 static const char *const TAG = "opentherm.number";
 
+// TO JEST BRAKUJĄCY ELEMENT:
+void OpenthermNumber::setup() {
+  if (!std::isnan(this->initial_value_)) {
+    this->publish_state(this->initial_value_);
+  }
+}
+
 void OpenthermNumber::control(float value) {
   if (this->parent_ != nullptr && this->message_id_ != 0) {
     OpenthermData data;
@@ -13,7 +20,6 @@ void OpenthermNumber::control(float value) {
     data.id = this->message_id_;
     data.u16((uint16_t)value); 
     
-    // Używamy nowej metody, którą dodaliśmy do hub.h
     this->parent_->send_raw_message(data);
     this->publish_state(value);
     
