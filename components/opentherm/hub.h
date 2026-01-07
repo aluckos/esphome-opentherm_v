@@ -106,6 +106,14 @@ class OpenthermHub : public Component {
       ESP_LOGD("opentherm_hub", "Wysłano ID: %d", data.id);
     }
   }
+  void send_tsp_request(uint8_t tsp_id) {
+    OpenthermData data;
+    data.type = MessageType::READ_DATA;
+    data.id = 89; // HVAC_IDX_TSP
+    data.valueHB = tsp_id; // Numer parametru TSP
+    data.valueLB = 0;
+    this->send_raw_message(data);
+}
 
   void add_initial_message(MessageId message_id) { this->configured_messages_[message_id] = INITIAL_UNORDERED_MESSAGE_ORDER; }
   void add_initial_message(MessageId message_id, uint8_t order) { this->configured_messages_[message_id] = order; }
