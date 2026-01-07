@@ -7,7 +7,14 @@ from esphome.components import sensor
 import esphome.config_validation as cv
 from esphome.const import CONF_ID, CONF_TRIGGER_ID, PLATFORM_ESP32, PLATFORM_ESP8266
 
+# Importujemy z lokalnych plików pomocniczych
 from . import const, generate, schema, validate
+
+# EKSPOZYCJA STAŁYCH DLA PODKOMPONENTÓW (number, sensor, itp.)
+# To rozwiąże błąd ImportError w number/__init__.py
+opentherm_ns = generate.opentherm_ns
+OpenthermComponent = generate.OpenthermHub  # W tej bibliotece klasą główną jest OpenthermHub
+CONF_OPENTHERM_ID = "opentherm_id"
 
 CODEOWNERS = ["@olegtarasov"]
 MULTI_CONF = True
@@ -135,15 +142,3 @@ async def to_code(config: dict[str, Any]) -> None:
         generate.define_message_handler(const.SETTING, settings, schema.SETTINGS)
         generate.define_setting_readers(const.SETTING, settings)
         generate.add_messages(var, settings, schema.SETTINGS)
-
-    for conf in config.get(CONF_BEFORE_SEND, []):
-        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], var)
-        await automation.build_automation(
-            trigger, [(generate.OpenthermData.operator("ref"), "x")], conf
-        )
-
-    for conf in config.get(CONF_BEFORE_PROCESS_RESPONSE, []):
-        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], var)
-        await automation.build_automation(
-            trigger, [(generate.OpenthermData.operator("ref"), "x")], conf
-        )
