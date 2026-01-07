@@ -18,6 +18,7 @@ MSG_DATA_TYPES = {
     "u16",
     "s16",
     "f88",
+    "u16_tsp",
 }
 
 
